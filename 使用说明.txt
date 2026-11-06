@@ -1,0 +1,49 @@
+英文刷题视频制作工具（Windows）
+
+本工具复现当前样片流程：
+完整题目和 A-D 选项同页 → 只朗读英文题干 → 静默倒计时 10 秒 → 答案和解析（优先同页，内容较多时自动续页）。
+不朗读选项，不解析错误选项。画幅为 1080×1920。所有题目按顺序合成为一个 MP4。
+
+使用方法
+1. 将压缩包完整解压到一个普通文件夹，不要在压缩包内部直接运行。
+2. 电脑需有 Python 3.10 或更新版本。你当前这台电脑已经安装 Python 3.13。
+   其他电脑可从 https://www.python.org/downloads/windows/ 安装 Python，并勾选 Add Python to PATH。
+3. 用记事本或代码编辑器打开 questions.json，修改题目、四个选项、答案和解析，保存为 UTF-8。
+4. 双击 run.cmd。首次运行会创建本文件夹内的 .venv，并联网安装依赖。
+5. 等待终端显示 COMPLETE；视频保存在本工具的 videos 文件夹。
+   每次生成使用新文件名，保留旧视频。work 文件夹保存对应页面、声音和时间信息。
+
+questions.json 的字段
+questions：题目列表。放一个对象就是一道题，放五个对象就是五道题。
+question：完整英文题干。
+options：A、B、C、D 四个完整英文选项。
+answer：正确答案字母，例如 A。
+explanation：英文解析，可按内容分段，不固定段数。每条包含 title（小标题）和 text（解释正文）。
+答案页放不下时自动续页，长段落也会分页；每页对应独立配音，读完再翻页，不截断内容。
+视频会朗读题干、正确答案字母和解析 text，不朗读选项和解析小标题。
+保持 JSON 双引号和逗号正确。可以让豆包按附带的提示词输出整个 JSON，再替换文件内容。
+
+重要说明
+- 本工具不会自行推理或核对答案；解析需要你或其他 AI 事先提供并核对。
+- 只适配英文排版和英文配音。例题的题干与选项完整保留，不会自动摘要。
+- 解析自动续页，保持正常字号，不需要为了塞进一页而强行缩短。
+- 题目和 A-D 选项仍采用同页布局；极长题目超出单页容量时会提示，不会偷偷删字。
+- 页面本地生成；英文旁白文本会发给 Microsoft Edge 在线语音服务用于合成。
+- 配音失败时请检查网络及错误信息；服务变化可能需要更新 edge-tts。
+- 初次安装和配音需要联网；不需要豆包视频会员，也不需要填写 API Key。
+- 本次实际制作未调用收费 API；这不构成在线语音永久免费、无限量或商业授权承诺。
+- 本工具未包含 Python 或第三方依赖，首次运行会下载，后续沿用本地环境。
+
+手动运行（可选）
+python -m venv .venv
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+.venv\Scripts\python.exe generate.py
+
+采用的组件与官方/上游说明
+Pillow（本地文字排版）：https://python-pillow.org/
+imageio-ffmpeg（提供本地 FFmpeg）：https://github.com/imageio/imageio-ffmpeg
+edge-tts（第三方在线语音客户端）：https://github.com/rany2/edge-tts
+
+例题解析核对参考
+S3 Transfer Acceleration：https://docs.aws.amazon.com/AmazonS3/latest/userguide/transfer-acceleration.html
+Multipart upload：https://docs.aws.amazon.com/AmazonS3/latest/userguide/mpuoverview.html
