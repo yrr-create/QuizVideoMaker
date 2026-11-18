@@ -50,28 +50,50 @@ def paragraph(draw, text, x, y, face, width, leading):
     return y
 
 
-def canvas(number, answer=False):
+def canvas(number, exam_title, answer=False):
     im = Image.new('RGB', (1080, 1920), 'white')
     d = ImageDraw.Draw(im)
     color = GREEN if answer else BLUE
-    d.text((64, 58), f'QUESTION {number:02d}', font=font(42, True), fill=INK)
-    d.text((805, 69), 'ANSWER' if answer else 'PRACTICE', font=font(25, True), fill=GRAY)
+    heading = f'QUESTION {number:02d}'
+    title_width = d.textlength(exam_title, font=font(25, True))
+    title_x = 1016 - title_width
+    if 64 + d.textlength(heading, font=font(42, True)) + 40 > title_x:
+        raise ValueError('Question number or exam_title is too long for the header.')
+    d.text((64, 58), heading, font=font(42, True), fill=INK)
+    d.text((title_x, 69), exam_title, font=font(25, True), fill=GRAY)
     d.line((64, 131, 1016, 131), fill=color, width=4)
     return im, d
 
 
-def question_page(item, number, seconds=None):
-    im, d = canvas(number)
+def question_page(item, number, seconds=None, exam_title='AWS SAA-C03'):
+    im, d = canvas(item.get('number', number), exam_title)
+    separate_options = False
     for size in range(43, 35, -1):
         face, leading = font(size), round(size * 1.3)
         end = 176 + len(lines(d, item['question'], face, 952)) * leading + 40
-        end += sum(len(lines(d, item['options'][k], face, 866)) * leading + 42 for k in 'ABCD')
+        end += sum(len(lines(d, item['options'][k], face, 866)) * leading + 42 for k in sorted(item['options']))
         if end <= 1750:
             break
     else:
-        raise ValueError(f'Question {number} is too long for a readable single page. No text was omitted.')
-    y = paragraph(d, item['question'], 64, 176, face, 952, leading) + 32
-    for letter in 'ABCD':
+        separate_options = True
+        for size in range(43, 35, -1):
+            face, leading = font(size), round(size * 1.3)
+            if seconds is None:
+                end = 176 + len(lines(d, item['question'], face, 952)) * leading + 32
+            else:
+                end = 242 + sum(len(lines(d, text, face, 871)) * leading + 42 for text in item['options'].values())
+            if end < 1770:
+                break
+        else:
+            raise ValueError(f'Question {number}: question or options exceed a readable page. No text was omitted.')
+    if separate_options and seconds is not None:
+        count = len(item['answer'])
+        d.text((64, 176), f'SELECT {count} ANSWER' + ('S' if count > 1 else ''), font=font(31, True), fill=GRAY)
+        y = 242
+    else:
+        y = paragraph(d, item['question'], 64, 176, face, 952, leading) + 32
+    visible_options = [] if separate_options and seconds is None else sorted(item['options'])
+    for letter in visible_options:
         d.line((64, y, 1016, y), fill='#DCE3ED', width=2)
         y += 20
         d.rounded_rectangle((64, y + 2, 115, y + 53), radius=8, fill='#F0F3F8')
@@ -80,7 +102,9 @@ def question_page(item, number, seconds=None):
     if y >= 1770:
         raise ValueError(f'Question {number} exceeds the page boundary.')
     d.rounded_rectangle((64, 1795, 1016, 1884), radius=14, fill='#EDF3FF')
-    label = 'LISTEN TO THE QUESTION' if seconds is None else 'CHOOSE YOUR ANSWER'
+    label = 'LISTEN TO THE QUESTION' if seconds is None else ('CHOOSE YOUR ANSWERS' if len(item['answer']) > 1 else 'CHOOSE YOUR ANSWER')
+    if separate_options and seconds is None:
+        label = 'LISTEN TO THE QUESTION - OPTIONS FOLLOW'
     d.text((89, 1825), label, font=font(27, True), fill=BLUE)
     if seconds is not None:
         d.text((912, 1816), f'{seconds:02d}', font=font(44, True), fill=BLUE)
@@ -89,18 +113,29 @@ def question_page(item, number, seconds=None):
     return p
 
 
-def answer_pages(item, number):
+def answer_pages(item, number, exam_title='AWS SAA-C03'):
     """Keep normal font sizes and continue long explanations on the next page."""
-    letter = item['answer']
+    letters = list(item['answer'])
+    answer_label = 'Correct answers' if len(letters) > 1 else 'Correct answer'
+    answer_text = ', '.join(letters)
     result = []
-    im, d = canvas(number, True)
-    d.text((64, 190), f'Correct answer: {letter}', font=font(66, True), fill=GREEN)
-    text, face = item['options'][letter], font(44)
-    bottom = 348 + len(lines(d, text, face, 872)) * 61 + 30
+    im, d = canvas(item.get('number', number), exam_title, True)
+    d.text((64, 190), f'{answer_label}: {answer_text}', font=font(66, True), fill=GREEN)
+    texts = [((letter + '. ') if len(letters) > 1 else '') + item['options'][letter] for letter in letters]
+    face = font(44)
+    bottom = 348 + sum(len(lines(d, text, face, 872)) * 61 for text in texts) + 24 * (len(texts) - 1) + 30
+    if bottom > 1705:
+        raise ValueError(f'Answer {number}: correct options are too long for the answer page.')
     d.rounded_rectangle((64, 317, 1016, bottom), radius=18, fill='#EDF7F2')
-    paragraph(d, text, 104, 348, face, 872, 61)
+    text_y = 348
+    for text in texts:
+        text_y = paragraph(d, text, 104, text_y, face, 872, 61) + 24
     y = bottom + 60
-    spoken = [f'The correct answer is {letter}.']
+    spoken = [f'The correct answers are {" and ".join(letters)}.' if len(letters) > 1 else f'The correct answer is {letters[0]}.']
+    for letter in letters:
+        option_text = item['options'][letter].strip()
+        spoken.append((f'Option {letter}. ' if len(letters) > 1 else '') + option_text.rstrip('.!?') + '.')
+    spoken.append('Explanation.')
     limit, next_start = 1765, 340
 
     def save_page():
@@ -111,7 +146,7 @@ def answer_pages(item, number):
     def next_page():
         nonlocal im, d, y, spoken
         save_page()
-        im, d = canvas(number, True)
+        im, d = canvas(item.get('number', number), exam_title, True)
         d.text((64, 190), 'Explanation (continued)', font=font(58, True), fill=GREEN)
         y, spoken = next_start, []
 
@@ -187,7 +222,12 @@ def encode(job):
 
 
 async def main():
-    questions = json.loads((ROOT / 'questions.json').read_text('utf-8-sig'))['questions']
+    data = json.loads((ROOT / 'questions.json').read_text('utf-8-sig'))
+    questions = data['questions']
+    exam_title = data.get('exam_title', 'AWS SAA-C03')
+    if not isinstance(exam_title, str) or not exam_title.strip():
+        raise ValueError('exam_title must be a nonempty string.')
+    exam_title = exam_title.strip()
     if not isinstance(questions, list) or not questions:
         raise ValueError('questions must be a nonempty list.')
     WORK.mkdir(parents=True)
@@ -195,13 +235,23 @@ async def main():
     pages = []
     # Check every page before making any online speech requests.
     for number, item in enumerate(questions, 1):
-        if set(item['options']) != set('ABCD') or item['answer'] not in 'ABCD' or len(item['answer']) != 1:
-            raise ValueError(f'Question {number}: provide options A-D and one correct answer letter.')
-        if not item['question'].strip() or not item['explanation'] or any(not item['options'][k].strip() for k in 'ABCD'):
+        display_number = item.get('number', number)
+        if type(display_number) is not int or display_number < 1:
+            raise ValueError(f'Question {number}: number must be a positive integer.')
+        if set(item['options']) not in (set('ABCD'), set('ABCDE')):
+            raise ValueError(f'Question {number}: provide options A-D or A-E.')
+        answer = item['answer']
+        if not isinstance(answer, str):
+            raise ValueError(f'Question {number}: answer must contain option letters, for example A or AB.')
+        answer = answer.strip().upper()
+        if not answer or len(set(answer)) != len(answer) or not set(answer) <= set(item['options']):
+            raise ValueError(f'Question {number}: answer must contain distinct letters from the available options.')
+        item['answer'] = ''.join(sorted(answer))
+        if not item['question'].strip() or not item['explanation'] or any(not text.strip() for text in item['options'].values()):
             raise ValueError(f'Question {number}: question, options, and explanation must not be empty.')
-        pictures = [question_page(item, number)]
-        pictures += [question_page(item, number, n) for n in range(COUNTDOWN, 0, -1)]
-        pages.append({'question': pictures, 'answer': answer_pages(item, number)})
+        pictures = [question_page(item, number, exam_title=exam_title)]
+        pictures += [question_page(item, number, n, exam_title) for n in range(COUNTDOWN, 0, -1)]
+        pages.append({'question': pictures, 'answer': answer_pages(item, number, exam_title)})
     jobs, pcm_parts, timeline = [], [], []
     clock = 0
     for number, (item, pictures) in enumerate(zip(questions, pages), 1):
@@ -220,7 +270,7 @@ async def main():
             images.append(page['image'])
             durations.append(aframes)
             pcm_parts.append(apcm)
-        timeline.append({'question': number, 'start': clock, 'countdown_start': clock + qframes / FPS, 'answer_start': clock + qframes / FPS + COUNTDOWN, 'answer_page_starts': answer_starts})
+        timeline.append({'question': item.get('number', number), 'start': clock, 'countdown_start': clock + qframes / FPS, 'answer_start': clock + qframes / FPS + COUNTDOWN, 'answer_page_starts': answer_starts})
         clock += sum(durations) / FPS
         jobs += [(len(jobs) + i, picture, frames) for i, (picture, frames) in enumerate(zip(images, durations))]
     with ThreadPoolExecutor(max_workers=2) as pool:

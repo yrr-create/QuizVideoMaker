@@ -1,33 +1,37 @@
 英文刷题视频制作工具（Windows）
 
 本工具复现当前样片流程：
-完整题目和 A-D 选项同页 → 只朗读英文题干 → 静默倒计时 10 秒 → 答案和解析（优先同页，内容较多时自动续页）。
-不朗读选项，不解析错误选项。画幅为 1080×1920。所有题目按顺序合成为一个 MP4。
+显示题干与选项 → 只朗读英文题干 → 显示完整选项并静默倒计时 10 秒 → 宣布答案字母并朗读正确选项全文 → 一段简短英文解析。
+题干与选项优先同页；长题先显示题干，读完后显示完整选项。
+多选题会逐一朗读所有正确选项。画幅为 1080×1920。所有题目按顺序合成为一个 MP4。
 
 使用方法
 1. 将压缩包完整解压到一个普通文件夹，不要在压缩包内部直接运行。
-2. 电脑需有 Python 3.10 或更新版本。你当前这台电脑已经安装 Python 3.13。
+2. 电脑需有 Python 3.10 或更新版本。
    其他电脑可从 https://www.python.org/downloads/windows/ 安装 Python，并勾选 Add Python to PATH。
-3. 用记事本或代码编辑器打开 questions.json，修改题目、四个选项、答案和解析，保存为 UTF-8。
+3. 用记事本或代码编辑器打开 questions.json，修改题目、全部选项、答案和解析，保存为 UTF-8。
 4. 双击 run.cmd。首次运行会创建本文件夹内的 .venv，并联网安装依赖。
 5. 等待终端显示 COMPLETE；视频保存在本工具的 videos 文件夹。
    每次生成使用新文件名，保留旧视频。work 文件夹保存对应页面、声音和时间信息。
 
 questions.json 的字段
+exam_title：每页右上角的考试名称，省略时默认 AWS SAA-C03。
+number：每题原始题号（正整数），省略时按列表顺序从 1 编号。
 questions：题目列表。放一个对象就是一道题，放五个对象就是五道题。
 question：完整英文题干。
-options：A、B、C、D 四个完整英文选项。
-answer：正确答案字母，例如 A。
-explanation：英文解析，可按内容分段，不固定段数。每条包含 title（小标题）和 text（解释正文）。
+options：A-D 或 A-E 的完整英文选项，正文不必重复字母标签。
+answer：正确答案字母，例如 A；多选题写连续字母，例如 AB 或 BE。小写自动转大写，不允许重复字母或不存在的选项。
+explanation：建议只放一条，包含 title（小标题）和一段简短英文 text（正文）。依据官方文档直接解释正确答案如何满足题意。仍兼容旧的多段解析，不会自动改写。
 答案页放不下时自动续页，长段落也会分页；每页对应独立配音，读完再翻页，不截断内容。
-视频会朗读题干、正确答案字母和解析 text，不朗读选项和解析小标题。
+视频依次朗读题干、正确答案字母、正确选项全文和解析 text；不朗读解析小标题。
 保持 JSON 双引号和逗号正确。可直接编辑示例 JSON，题目和解析可以从任何来源准备。
 
 重要说明
 - 本工具不会自行推理或核对答案；解析需要你或其他 AI 事先提供并核对。
 - 只适配英文排版和英文配音。例题的题干与选项完整保留，不会自动摘要。
 - 解析自动续页，保持正常字号，不需要为了塞进一页而强行缩短。
-- 题目和 A-D 选项仍采用同页布局；极长题目超出单页容量时会提示，不会偷偷删字。
+- 题干和选项优先同页，长题自动分为题干页和完整选项倒计时页。题干或选项单独仍放不下时会报错，不删字。
+- 正确选项全文超出答案页容量时会明确报错。
 - 页面本地生成；英文旁白文本会发给 Microsoft Edge 在线语音服务用于合成。
 - 配音失败时请检查网络及错误信息；服务变化可能需要更新 edge-tts。
 - 初次安装和配音需要联网；不需要视频生成服务会员，也不需要填写 API Key。
@@ -45,5 +49,4 @@ imageio-ffmpeg（提供本地 FFmpeg）：https://github.com/imageio/imageio-ffm
 edge-tts（第三方在线语音客户端）：https://github.com/rany2/edge-tts
 
 例题解析核对参考
-S3 Transfer Acceleration：https://docs.aws.amazon.com/AmazonS3/latest/userguide/transfer-acceleration.html
-Multipart upload：https://docs.aws.amazon.com/AmazonS3/latest/userguide/mpuoverview.html
+Amazon Athena：https://docs.aws.amazon.com/athena/latest/ug/what-is.html
